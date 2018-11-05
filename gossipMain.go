@@ -73,7 +73,6 @@ func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunic
 func serverSimulation(id int, neighbors neighborhood) {
   defer wg.Done()
 
-  var sema = make(chan struct{}, 1)  // for access to heartBeatTable
   heartBeatTable := []serverHeartStats{}
    
   serverStatus := serverHeartStats{id, 0, time.Now()}
@@ -85,41 +84,30 @@ func serverSimulation(id int, neighbors neighborhood) {
   for {
       if time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
           sendClock = time.Now()
-          go func() {
-              sema <- struct{}{}
-              (*neighbors.neighborCommunication[0].outgoing) <- heartBeatTable;
-              (*neighbors.neighborCommunication[1].outgoing) <- heartBeatTable;
-              <-sema
-          }()
+          (*neighbors.neighborCommunication[0].outgoing) <- heartBeatTable;
+          (*neighbors.neighborCommunication[1].outgoing) <- heartBeatTable;   
       }
-      go func() {
-          select {
-              case m1 := <- (*neighbors.neighborCommunication[0].incoming):
-                  sema <- struct{}{}
-                  for _, m := range m1 {
-                      tableLength := len(heartBeatTable)
-                      updateHeartBeatTable(&heartBeatTable, tableLength, m)
-                  }
-                  <-sema
-              case m2 := <- (*neighbors.neighborCommunication[1].incoming):
-                  sema <- struct{}{}
-                  for _, m := range m2 {
-                      tableLength := len(heartBeatTable)
-                      updateHeartBeatTable(&heartBeatTable, tableLength, m)
-                  }
-                  <-sema
-          }
-      }()
-      if time.Now().Sub(serverStatus.heartBeatTime) > time.Duration(heartRate)*time.Second {
-          sema <- struct{}{}
-          for _, stat := range heartBeatTable {
-              if stat.id == id {
-                  stat.heartBeatCounter += 1
-                  stat.heartBeatTime = time.Now()
-                  serverStatus.heartBeatTime = time.Now()
+      select {
+          case m1 := <- (*neighbors.neighborCommunication[0].incoming):
+              for _, m := range m1 {
+                  tableLength := len(heartBeatTable)
+                  updateHeartBeatTable(&heartBeatTable, tableLength, m)
               }
-          }
-          <-sema
+          case m2 := <- (*neighbors.neighborCommunication[1].incoming):
+              for _, m := range m2 {
+                  tableLength := len(heartBeatTable)
+                  updateHeartBeatTable(&heartBeatTable, tableLength, m)
+              }
+          default:
+              if time.Now().Sub(serverStatus.heartBeatTime) > time.Duration(heartRate)*time.Second {
+                  for idx, _ := range heartBeatTable {
+                      if heartBeatTable[idx].id == id {
+                          heartBeatTable[idx].heartBeatCounter += 1
+                          heartBeatTable[idx].heartBeatTime = time.Now()
+                          serverStatus.heartBeatTime = time.Now()
+                      }
+                  }
+              }                  
       }
   }
 }
@@ -140,9 +128,9 @@ func updateHeartBeatTable(heartBeatTable *[]serverHeartStats, tableLength int, m
 }
 
 func checkForTimeouts(heartBeatTable *[]serverHeartStats, tableLength int) {
-    for i:=0; i < tableLength; i++ {
-        if time.Now().Sub((*heartBeatTable)[i].heartBeatTime) > time.Duration(2*timeout)*time.Second {
-            (*heartBeatTable) = append((*heartBeatTable)[:i], (*heartBeatTable)[i+1:]...)
+    for idx, _ := range (*heartBeatTable) {
+        if time.Now().Sub((*heartBeatTable)[idx].heartBeatTime) > time.Duration(2*timeout)*time.Second {
+            (*heartBeatTable) = append((*heartBeatTable)[:idx], (*heartBeatTable)[idx+1:]...)
         }
     }
 }
