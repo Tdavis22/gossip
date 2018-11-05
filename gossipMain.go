@@ -114,15 +114,18 @@ func serverSimulation(id int, neighbors neighborhood) {
 
 func updateHeartBeatTable(heartBeatTable *[]serverHeartStats, tableLength int, m serverHeartStats) {
     tableIndex := 0
-    for ; tableIndex < tableLength; tableIndex++ {
-        if (*heartBeatTable)[tableIndex].id == m.id {
-            if (*heartBeatTable)[tableIndex].heartBeatCounter < m.heartBeatCounter {
-                (*heartBeatTable)[tableIndex].heartBeatCounter = m.heartBeatCounter
-                (*heartBeatTable)[tableIndex].heartBeatTime = time.Now()
+    var found bool = false
+    for idx, _ := range (*heartBeatTable) {
+        if (*heartBeatTable)[idx].id == m.id {
+            if (*heartBeatTable)[idx].heartBeatCounter < m.heartBeatCounter {
+                (*heartBeatTable)[idx].heartBeatCounter = m.heartBeatCounter
+                (*heartBeatTable)[idx].heartBeatTime = time.Now()
             }
+            found = true
+            break
         }
     }
-    if tableIndex == tableLength {
+    if found == false {
         (*heartBeatTable) = append((*heartBeatTable), serverHeartStats{m.id, m.heartBeatCounter, time.Now()})
     }
 }
