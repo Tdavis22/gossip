@@ -38,15 +38,17 @@ func runGossipSimulation(numServers int) {
 	allNeighborhoods := initializeNeighbors(numServers)
 	wg.Add(numServers)
 
-	for i := 0; i < numServers; i++ {
+        printMutex := &sync.Mutex{}
+	for i:= 0; i < numServers; i++ {
+
 		println(i, " neighbors [", allNeighborhoods[i].neighborCommunication[0].neighborId, ",",
 			allNeighborhoods[i].neighborCommunication[1].neighborId, ",",
 			allNeighborhoods[i].neighborCommunication[2].neighborId, "]")
 	}
 
-	for i := 0; i < numServers; i++ {
-		go serverSimulation(i, allNeighborhoods[i], numServers)
-	}
+	for i:= 0; i < numServers; i++ {
+            go serverSimulation(i, allNeighborhoods[i], numServers, printMutex)
+        }
 
 	time.Sleep(1000000)
 
@@ -86,26 +88,25 @@ func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunic
 	return neighbor1To2, neighbor2To1
 }
 
-func serverSimulation(id int, neighbors neighborhood, numServers int) {
+func serverSimulation(id int, neighbors neighborhood, numServers int, printMutex *sync.Mutex) {
 	isFailing := false;
 	defer wg.Done()
 
-	printMutex := &sync.Mutex{}
 	heartBeatTable := initializeHeartBeatTable(neighbors, numServers)
 
 	heartBeatTable[id] = serverHeartStats{id: id, heartBeatCounter: 0, heartBeatTime: time.Now()}
 	sendClock := time.Now()
-	printMutex.Lock()
-	failClock := time.Now()
 
-	fmt.Println(id)
+        failClock := time.Now()
+
+
 	for {
 		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
 			sendClock = time.Now()
 			for idx, _ := range neighbors.neighborCommunication {
 				*neighbors.neighborCommunication[idx].outgoing <- heartBeatTable
 			}
-			printHeartBeatTable(id, heartBeatTable)
+			printHeartBeatTable(id, heartBeatTable, printMutex)
 		}
 		select {
 		    case m1 := <-(*neighbors.neighborCommunication[0].incoming):
@@ -138,7 +139,6 @@ func serverSimulation(id int, neighbors neighborhood, numServers int) {
                 checkForTimeouts(&heartBeatTable)
         }
 	}
-	printMutex.Unlock()
 }
 
 func initializeHeartBeatTable(neighbors neighborhood, numServers int) []serverHeartStats {
@@ -171,13 +171,16 @@ func checkForTimeouts(heartBeatTable *[]serverHeartStats) {
 	}
 }
 
-func printHeartBeatTable(id int, heartBeatTable []serverHeartStats) {
-	printMutex := &sync.Mutex{}
-	printMutex.Lock()
-	println(id, "heartBeatTable: ")
+func printHeartBeatTable(id int, heartBeatTable []serverHeartStats, printMutex *sync.Mutex) {
+        printMutex.Lock()
+        println(id, "heartBeatTable: " )
 	for i := 0; i < len(heartBeatTable); i++ {
 		neighborStats := heartBeatTable[i]
-		println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", (neighborStats.heartBeatTime.Sub(simulationStartTime).String()), "isFailing: ", neighborStats.failing)
+                x := neighborStats.heartBeatTime.Sub(simulationStartTime)
+		if x < 0 {
+                    x = -1
+                }
+                println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", x, "isFailing: ", neighborStats.failing)
 	}
 	printMutex.Unlock()
 }
