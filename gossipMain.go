@@ -1,6 +1,6 @@
-package gossip
+package main
 import (
-	"sync"
+        "sync"
 	"time"
 )
 
@@ -24,7 +24,7 @@ type neighborCommunication struct {
 
 
 func runGossipSimulation(numServers int) {
-	writeMutex := sync.Mutex{}
+
 	allNeighborhoods := initializeNeighbors(numServers)
 
 	for i:= 0; i < numServers; i++ {
@@ -34,10 +34,10 @@ func runGossipSimulation(numServers int) {
 	}
 
 	for i:= 0; i < numServers; i++ {
-		go serverSimulation(i, allNeighborhoods[i], writeMutex)
+		go serverSimulation(i, allNeighborhoods[i])
 	}
 
-	time.Sleep(20)
+	time.Sleep(1000000)
 
 }
 
@@ -77,11 +77,10 @@ func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunic
 
 
 
-func serverSimulation(id int, neighbors neighborhood, writeMutex sync.Mutex) {
+func serverSimulation(id int, neighbors neighborhood) {
 	//isSick := false
 	heartbeatTable := initializeHeartBeatTable(neighbors)
-
-	printHeartBeatTable(id, heartbeatTable, writeMutex)
+	printHeartBeatTable(id, heartbeatTable)
 
 }
 
@@ -99,14 +98,19 @@ func initializeHeartBeatTable(neighbors neighborhood) []serverHeartStats{
 	return heartbeatTable
 }
 
-func printHeartBeatTable(id int, heartBeatTable []serverHeartStats, writeMutex sync.Mutex) {
-	println(id, "heartbeats: " )
+func printHeartBeatTable(id int, heartBeatTable []serverHeartStats) {
+        printMutex := &sync.Mutex{}
+        printMutex.Lock()
+        println(id, "heartbeats: " )
 	for i := 0; i < len(heartBeatTable); i++ {
 		neighborStats := heartBeatTable[i]
 		println("id:", neighborStats.id, "heartCounter:", neighborStats.heartbeatCounter, "timer:", neighborStats.heartBeatTime.String())
 	}
+        printMutex.Unlock()
 }
 
 func main() {
 	runGossipSimulation(8)
+
+
 }
