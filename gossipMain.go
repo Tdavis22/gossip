@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+    "math/rand"
 	"sync"
 	"time"
 )
@@ -31,6 +32,7 @@ var wg sync.WaitGroup
 var timeout int = 5
 var heartRate int = 2
 var sendout int = 3
+var failRate int = 2
 
 func runGossipSimulation(numServers int) {
 	writeMutex := sync.Mutex{}
@@ -93,9 +95,18 @@ func serverSimulation(id int, neighbors neighborhood, numServers int, writeMutex
 
 	heartBeatTable[id] = serverHeartStats{id: id, heartBeatCounter: 0, heartBeatTime: time.Now()}
 	sendClock := time.Now()
+    failClock := time.Now()
 
 	fmt.Println(id)
 	for {
+        if time.Now().Sub(failClock) > time.Duration(failRate)*time.Second {
+			failClock = time.Now()
+            if (rand.Intn(8) == id) {
+                isFailing = !isFailing
+                fmt.Println(id, "'s Failing State change to: ", isFailing)
+            }
+		}
+
 		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
 			sendClock = time.Now()
 			for idx, _ := range neighbors.neighborCommunication {
@@ -104,26 +115,26 @@ func serverSimulation(id int, neighbors neighborhood, numServers int, writeMutex
 			printHeartBeatTable(id, heartBeatTable, writeMutex)
 		}
 		select {
-		case m1 := <- (*neighbors.neighborCommunication[0].incoming):
-			for _, m := range m1 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		case m2 := <- (*neighbors.neighborCommunication[1].incoming):
-			for _, m := range m2 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		case m3 := <- (*neighbors.neighborCommunication[2].incoming):
-			for _, m := range m3 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		default:
-			if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
-				heartBeatTable[id].heartBeatCounter += 1
-				heartBeatTable[id].heartBeatTime = time.Now()
-			}
+		    case m1 := <- (*neighbors.neighborCommunication[0].incoming):
+			    for _, m := range m1 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    case m2 := <- (*neighbors.neighborCommunication[1].incoming):
+			    for _, m := range m2 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    case m3 := <- (*neighbors.neighborCommunication[2].incoming):
+			    for _, m := range m3 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    default:
+			    if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
+				    heartBeatTable[id].heartBeatCounter += 1
+				    heartBeatTable[id].heartBeatTime = time.Now()
+			    }
 		}
 	}
 }
