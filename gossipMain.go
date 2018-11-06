@@ -145,6 +145,7 @@ func updateHeartBeatTable(heartBeatTable *[]serverHeartStats, tableLength int, m
 		(*heartBeatTable)[m.id].id = m.id
 		(*heartBeatTable)[m.id].heartBeatCounter = m.heartBeatCounter
 		(*heartBeatTable)[m.id].heartBeatTime = m.heartBeatTime
+		(*heartBeatTable)[m.id].failing = m.failing
 	}
 }
 
