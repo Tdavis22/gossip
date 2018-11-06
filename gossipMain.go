@@ -77,15 +77,21 @@ func serverSimulation(id int, neighbors neighborhood) {
    
   serverStatus := serverHeartStats{id, 0, time.Now()}
   heartBeatTable = append(heartBeatTable, serverStatus)
-
   sendClock := time.Now()
 
   fmt.Println(id)
   for {
       if time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
           sendClock = time.Now()
-          (*neighbors.neighborCommunication[0].outgoing) <- heartBeatTable;
-          (*neighbors.neighborCommunication[1].outgoing) <- heartBeatTable;   
+          select {
+              case (*neighbors.neighborCommunication[0].outgoing) <- heartBeatTable:
+                  fmt.Println(id, " sent message")
+              case (*neighbors.neighborCommunication[1].outgoing) <- heartBeatTable:
+                  fmt.Println(id, " sent message")
+              case <- time.After(500 * time.Millisecond):
+                  fmt.Println(id, " message not sent")
+          }
+
       }
       select {
           case m1 := <- (*neighbors.neighborCommunication[0].incoming):
@@ -113,8 +119,8 @@ func serverSimulation(id int, neighbors neighborhood) {
 }
 
 func updateHeartBeatTable(heartBeatTable *[]serverHeartStats, tableLength int, m serverHeartStats) {
-    tableIndex := 0
     var found bool = false
+
     for idx, _ := range (*heartBeatTable) {
         if (*heartBeatTable)[idx].id == m.id {
             if (*heartBeatTable)[idx].heartBeatCounter < m.heartBeatCounter {
