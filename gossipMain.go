@@ -74,8 +74,8 @@ func initializeNeighbors(numServers int) []neighborhood {
 }
 
 func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunication) {
-	chan1to2 := make(chan []serverHeartStats)
-	chan2to1 := make(chan []serverHeartStats)
+	chan1to2 := make(chan []serverHeartStats, 100)
+	chan2to1 := make(chan []serverHeartStats, 100)
 
 	neighbor1To2 := neighborCommunication{id2, &chan1to2, &chan2to1}
 	neighbor2To1 := neighborCommunication{id1, &chan2to1, &chan1to2}
@@ -84,6 +84,7 @@ func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunic
 }
 
 func serverSimulation(id int, neighbors neighborhood, numServers int) {
+	isFailing := false;
 	defer wg.Done()
 
         printMutex := &sync.Mutex{}
@@ -94,15 +95,10 @@ func serverSimulation(id int, neighbors neighborhood, numServers int) {
         printMutex.Lock()
 	fmt.Println(id)
 	for {
-		if time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
+		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
 			sendClock = time.Now()
-			select {
-			case (*neighbors.neighborCommunication[0].outgoing) <- heartBeatTable:
-				fmt.Println(id," to ", neighbors.neighborCommunication[0].neighborId, " sent message")
-			case (*neighbors.neighborCommunication[1].outgoing) <- heartBeatTable:
-				fmt.Println(id," to ", neighbors.neighborCommunication[1].neighborId, " sent message")
-			case <- time.After(500 * time.Millisecond):
-				fmt.Println(id, " message not sent")
+			for idx, _ := range neighbors.neighborCommunication {
+				*neighbors.neighborCommunication[idx].outgoing <- heartBeatTable
 			}
 			printHeartBeatTable(id, heartBeatTable)
 		}
@@ -114,6 +110,11 @@ func serverSimulation(id int, neighbors neighborhood, numServers int) {
 			}
 		case m2 := <- (*neighbors.neighborCommunication[1].incoming):
 			for _, m := range m2 {
+				tableLength := len(heartBeatTable)
+				updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			}
+		case m3 := <- (*neighbors.neighborCommunication[2].incoming):
+			for _, m := range m3 {
 				tableLength := len(heartBeatTable)
 				updateHeartBeatTable(&heartBeatTable, tableLength, m)
 			}
