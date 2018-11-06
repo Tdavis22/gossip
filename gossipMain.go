@@ -148,7 +148,7 @@ func initializeHeartBeatTable(neighbors neighborhood, numServers int) []serverHe
 
 	for i := 0; i < numNeighbors; i++ {
 		neighborComm := neighbors.neighborCommunication[i]
-		heartBeatTable[neighborComm.neighborId] = serverHeartStats{id: neighborComm.neighborId, heartBeatCounter: -1, heartBeatTime: time.Now()}
+		heartBeatTable[neighborComm.neighborId] = serverHeartStats{id: neighborComm.neighborId, heartBeatCounter: 0, heartBeatTime: time.Now()}
 	}
 
 	return heartBeatTable
@@ -180,7 +180,7 @@ func printHeartBeatTable(id int, heartBeatTable []serverHeartStats, printMutex *
 		if x < 0 {
                     x = -1
                 }
-                println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", x, "isFailing: ", neighborStats.failing)
+                println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", x.String(), "isFailing: ", neighborStats.failing)
 	}
 	printMutex.Unlock()
 }
