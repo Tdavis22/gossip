@@ -100,14 +100,6 @@ func serverSimulation(id int, neighbors neighborhood, numServers int) {
 
 	fmt.Println(id)
 	for {
-		if time.Now().Sub(failClock) > time.Duration(failRate)*time.Second {
-			failClock = time.Now()
-			if (rand.Intn(8) == id) {
-				isFailing = !isFailing
-				fmt.Println(id, "'s Failing State change to: ", isFailing)
-			}
-		}
-
 		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
 			sendClock = time.Now()
 			for idx, _ := range neighbors.neighborCommunication {
@@ -116,27 +108,35 @@ func serverSimulation(id int, neighbors neighborhood, numServers int) {
 			printHeartBeatTable(id, heartBeatTable)
 		}
 		select {
-		case m1 := <-(*neighbors.neighborCommunication[0].incoming):
-			for _, m := range m1 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		case m2 := <-(*neighbors.neighborCommunication[1].incoming):
-			for _, m := range m2 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		case m3 := <-(*neighbors.neighborCommunication[2].incoming):
-			for _, m := range m3 {
-				tableLength := len(heartBeatTable)
-				updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			}
-		default:
-			if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
-				heartBeatTable[id].heartBeatCounter += 1
-				heartBeatTable[id].heartBeatTime = time.Now()
-			}
-		}
+		    case m1 := <-(*neighbors.neighborCommunication[0].incoming):
+			    for _, m := range m1 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    case m2 := <-(*neighbors.neighborCommunication[1].incoming):
+			    for _, m := range m2 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    case m3 := <-(*neighbors.neighborCommunication[2].incoming):
+			    for _, m := range m3 {
+				    tableLength := len(heartBeatTable)
+				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			    }
+		    default:
+			    if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
+				    heartBeatTable[id].heartBeatCounter += 1
+				    heartBeatTable[id].heartBeatTime = time.Now()
+			    }
+                if time.Now().Sub(failClock) > time.Duration(failRate)*time.Second {
+			        failClock = time.Now()
+			        if (rand.Intn(32) == id) {
+				        isFailing = !isFailing
+				        fmt.Println(id, "'s Failing State change to: ", isFailing)
+			        }
+		        }
+                checkForTimeouts(&heartBeatTable)
+        }
 	}
 	printMutex.Unlock()
 }
@@ -163,10 +163,10 @@ func updateHeartBeatTable(heartBeatTable *[]serverHeartStats, tableLength int, m
 	}
 }
 
-func checkForTimeouts(heartBeatTable *[]serverHeartStats, tableLength int) {
+func checkForTimeouts(heartBeatTable *[]serverHeartStats) {
 	for idx, _ := range (*heartBeatTable) {
 		if time.Now().Sub((*heartBeatTable)[idx].heartBeatTime) > time.Duration(2*timeout)*time.Second {
-			(*heartBeatTable) = append((*heartBeatTable)[:idx], (*heartBeatTable)[idx+1:]...)
+			(*heartBeatTable)[idx].failing = true
 		}
 	}
 }
