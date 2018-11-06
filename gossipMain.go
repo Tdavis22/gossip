@@ -1,28 +1,28 @@
 package main
+
 import (
 	"fmt"
-    "math/rand"
+	"math/rand"
 	"sync"
 	"time"
 )
 
-type heartbeat int
-
 type serverHeartStats struct {
-	id int
+	id               int
 	heartBeatCounter int
-	heartBeatTime time.Time
-	failing bool
+	heartBeatTime    time.Time
+	failing          bool
 }
 
-type neighborhood struct { //The neighbors of one node to all of it's friends nodes
+type neighborhood struct {
+	//The neighbors of one node to all of it's friends nodes
 	neighborCommunication []neighborCommunication
 }
 
 type neighborCommunication struct {
 	neighborId int
-	outgoing *chan []serverHeartStats //from myId to neighborId
-	incoming *chan []serverHeartStats //from neighborId to myId
+	outgoing   *chan []serverHeartStats //from myId to neighborId
+	incoming   *chan []serverHeartStats //from neighborId to myId
 }
 
 var wg sync.WaitGroup
@@ -32,12 +32,15 @@ var timeout int = 5
 var heartRate int = 2
 var sendout int = 3
 var failRate int = 2
+var simulationStartTime time.Time = time.Now()
 
 func runGossipSimulation(numServers int) {
 	allNeighborhoods := initializeNeighbors(numServers)
 	wg.Add(numServers)
+
         printMutex := &sync.Mutex{}
 	for i:= 0; i < numServers; i++ {
+
 		println(i, " neighbors [", allNeighborhoods[i].neighborCommunication[0].neighborId, ",",
 			allNeighborhoods[i].neighborCommunication[1].neighborId, ",",
 			allNeighborhoods[i].neighborCommunication[2].neighborId, "]")
@@ -45,7 +48,7 @@ func runGossipSimulation(numServers int) {
 
 	for i:= 0; i < numServers; i++ {
             go serverSimulation(i, allNeighborhoods[i], numServers, printMutex)
-	}
+        }
 
 	time.Sleep(1000000)
 
@@ -57,7 +60,7 @@ func initializeNeighbors(numServers int) []neighborhood {
 
 	for i := 0; i < numServers; i++ { //connect neighbors circularly
 		neighborId := i + 1
-		if neighborId >= numServers  {
+		if neighborId >= numServers {
 			neighborId = 0
 		}
 		neighbor1To2, neighbor2To1 := connectNeighbors(i, neighborId)
@@ -93,15 +96,17 @@ func serverSimulation(id int, neighbors neighborhood, numServers int, printMutex
 
 	heartBeatTable[id] = serverHeartStats{id: id, heartBeatCounter: 0, heartBeatTime: time.Now()}
 	sendClock := time.Now()
-    failClock := time.Now()
+
+        failClock := time.Now()
+
 
 	for {
-        if time.Now().Sub(failClock) > time.Duration(failRate)*time.Second {
+		if time.Now().Sub(failClock) > time.Duration(failRate)*time.Second {
 			failClock = time.Now()
-            if (rand.Intn(8) == id) {
-                isFailing = !isFailing
-                fmt.Println(id, "'s Failing State change to: ", isFailing)
-            }
+			if (rand.Intn(8) == id) {
+				isFailing = !isFailing
+				fmt.Println(id, "'s Failing State change to: ", isFailing)
+			}
 		}
 
 		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
@@ -112,31 +117,31 @@ func serverSimulation(id int, neighbors neighborhood, numServers int, printMutex
 			printHeartBeatTable(id, heartBeatTable, printMutex)
 		}
 		select {
-		    case m1 := <- (*neighbors.neighborCommunication[0].incoming):
-			    for _, m := range m1 {
-				    tableLength := len(heartBeatTable)
-				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			    }
-		    case m2 := <- (*neighbors.neighborCommunication[1].incoming):
-			    for _, m := range m2 {
-				    tableLength := len(heartBeatTable)
-				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			    }
-		    case m3 := <- (*neighbors.neighborCommunication[2].incoming):
-			    for _, m := range m3 {
-				    tableLength := len(heartBeatTable)
-				    updateHeartBeatTable(&heartBeatTable, tableLength, m)
-			    }
-		    default:
-			    if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
-				    heartBeatTable[id].heartBeatCounter += 1
-				    heartBeatTable[id].heartBeatTime = time.Now()
-			    }
+		case m1 := <-(*neighbors.neighborCommunication[0].incoming):
+			for _, m := range m1 {
+				tableLength := len(heartBeatTable)
+				updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			}
+		case m2 := <-(*neighbors.neighborCommunication[1].incoming):
+			for _, m := range m2 {
+				tableLength := len(heartBeatTable)
+				updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			}
+		case m3 := <-(*neighbors.neighborCommunication[2].incoming):
+			for _, m := range m3 {
+				tableLength := len(heartBeatTable)
+				updateHeartBeatTable(&heartBeatTable, tableLength, m)
+			}
+		default:
+			if time.Now().Sub(heartBeatTable[id].heartBeatTime) > time.Duration(heartRate)*time.Second {
+				heartBeatTable[id].heartBeatCounter += 1
+				heartBeatTable[id].heartBeatTime = time.Now()
+			}
 		}
 	}
 }
 
-func initializeHeartBeatTable(neighbors neighborhood, numServers int) []serverHeartStats{
+func initializeHeartBeatTable(neighbors neighborhood, numServers int) []serverHeartStats {
 
 	numNeighbors := len(neighbors.neighborCommunication)
 	heartBeatTable := make([]serverHeartStats, numServers, numServers)
@@ -171,9 +176,13 @@ func printHeartBeatTable(id int, heartBeatTable []serverHeartStats, printMutex *
         println(id, "heartBeatTable: " )
 	for i := 0; i < len(heartBeatTable); i++ {
 		neighborStats := heartBeatTable[i]
-		println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", neighborStats.heartBeatTime.String())
+                x := neighborStats.heartBeatTime.Sub(simulationStartTime)
+		if x < 0 {
+                    x = -1
+                }
+                println("id:", neighborStats.id, "heartCounter:", neighborStats.heartBeatCounter, "timer:", x, "isFailing: ", neighborStats.failing)
 	}
-        printMutex.Unlock()
+	printMutex.Unlock()
 }
 
 func main() {
