@@ -86,6 +86,7 @@ func connectNeighbors(id1 int, id2 int) (neighborCommunication, neighborCommunic
 }
 
 func serverSimulation(id int, neighbors neighborhood, numServers int, writeMutex sync.Mutex) {
+	isFailing := false;
 	defer wg.Done()
 
 	heartBeatTable := initializeHeartBeatTable(neighbors, numServers)
@@ -95,7 +96,7 @@ func serverSimulation(id int, neighbors neighborhood, numServers int, writeMutex
 
 	fmt.Println(id)
 	for {
-		if time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
+		if !isFailing && time.Now().Sub(sendClock) > time.Duration(sendout)*time.Second {
 			sendClock = time.Now()
 			for idx, _ := range neighbors.neighborCommunication {
 				*neighbors.neighborCommunication[idx].outgoing <- heartBeatTable
